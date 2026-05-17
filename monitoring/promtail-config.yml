@@ -25,3 +25,10 @@ scrape_configs:
           service: mongo-api-service
           env: local-docker
           __path__: /var/log/apps/mongo-api-service/*.log
+      - targets:
+          - localhost
+        labels:
+          job: app-logs
+          service: incident-agent-workflow
+          env: local-docker
+          __path__: /var/log/apps/incident-agent-workflow/*.log

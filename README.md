@@ -11,7 +11,12 @@ apps/
   mongo-api-service/
     Dockerfile
     app/
+  incident-agent-workflow/
+    Dockerfile
+    main.py
 monitoring/
+  alert-rules.yml
+  alertmanager.yml
   grafana/provisioning/datasources/datasources.yml
   loki-config.yml
   prometheus.yml
@@ -44,8 +49,10 @@ This starts:
 weather-app1       http://127.0.0.1:8000
 mongo-api-service  http://127.0.0.1:9000
 prometheus         http://127.0.0.1:9090
+alertmanager       http://127.0.0.1:9093
 grafana            http://127.0.0.1:3000
 loki               http://127.0.0.1:3100
+agent workflow     http://127.0.0.1:9100
 mongodb            localhost:27017
 ```
 
@@ -79,3 +86,29 @@ Grafana login:
 ```text
 admin / admin
 ```
+
+Alerting flow:
+
+```text
+Prometheus alert rule
+  -> Alertmanager
+  -> incident-agent-workflow /alerts webhook
+  -> queries Prometheus and Loki for context
+  -> writes workflow logs to apps/incident-agent-workflow/logs/workflow.log
+```
+
+Current alerts:
+
+```text
+ServiceDown
+MongoDependencyDown
+Service5xxErrors
+```
+
+The Mongo API exports this dependency metric:
+
+```promql
+dependency_up{service="mongo-api-service", dependency="mongodb"}
+```
+
+Your real agentic workflow can replace [apps/incident-agent-workflow/main.py](apps/incident-agent-workflow/main.py).

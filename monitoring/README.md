@@ -40,6 +40,7 @@ Useful URLs:
 
 ```text
 Prometheus: http://127.0.0.1:9090
+Alertmanager: http://127.0.0.1:9093
 Grafana:    http://127.0.0.1:3000
 Loki:       http://127.0.0.1:3100
 ```
@@ -81,4 +82,17 @@ In Grafana, use the Loki data source and these LogQL queries:
 {service="mongo-api-service"}
 {service="weather-app1"} |= "ERROR"
 {service="mongo-api-service"} |= "ERROR"
+```
+
+Alerts are defined in `alert-rules.yml` and routed by `alertmanager.yml`.
+Alertmanager sends alert webhooks to:
+
+```text
+http://incident-agent-workflow:9100/alerts
+```
+
+The local agent workflow service logs received alerts and diagnostic context here:
+
+```bash
+tail -f ../apps/incident-agent-workflow/logs/workflow.log
 ```

@@ -24,3 +24,7 @@ async def disconnect():
 
 def get_db():
     return client[settings.MONGO_DB]
+
+
+def get_client():
+    return client

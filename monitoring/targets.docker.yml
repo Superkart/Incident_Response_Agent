@@ -9,3 +9,9 @@
   labels:
     service: mongo-api-service
     env: local-docker
+
+- targets:
+    - incident-agent-workflow:9100
+  labels:
+    service: incident-agent-workflow
+    env: local-docker

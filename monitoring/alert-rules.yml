@@ -1,0 +1,35 @@
+groups:
+  - name: local-service-alerts
+    rules:
+      - alert: ServiceDown
+        expr: up{job="local-services"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          workflow: incident-agent
+        annotations:
+          summary: "{{ $labels.service }} is down"
+          description: "Prometheus cannot scrape {{ $labels.service }} at {{ $labels.instance }}."
+          runbook: "Check container status, service logs, and recent deployments."
+
+      - alert: MongoDependencyDown
+        expr: dependency_up{service="mongo-api-service", dependency="mongodb"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          workflow: incident-agent
+        annotations:
+          summary: "MongoDB dependency is down for mongo-api-service"
+          description: "mongo-api-service is running, but its mongodb dependency check is failing."
+          runbook: "Check mongo container health, Mongo logs, and mongo-api-service readiness."
+
+      - alert: Service5xxErrors
+        expr: sum by (service) (rate(http_requests_total{job="local-services", status="5xx"}[2m])) > 0
+        for: 30s
+        labels:
+          severity: warning
+          workflow: incident-agent
+        annotations:
+          summary: "{{ $labels.service }} is returning 5xx errors"
+          description: "{{ $labels.service }} has non-zero 5xx error rate over the last 2 minutes."
+          runbook: "Check Loki logs for errors and inspect recent requests."
