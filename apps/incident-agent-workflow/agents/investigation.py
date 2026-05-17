@@ -7,9 +7,8 @@ import asyncio
 import json
 import logging
 
-import httpx
-
-from agents.base import run_llm_agent, extract_json
+from agents.llm import run_llm_agent, extract_json
+from tools.health import check_service_health
 from tools.logs import read_log_file, grep_log_file, extract_stack_trace
 
 logger = logging.getLogger(__name__)
@@ -163,20 +162,7 @@ _SERVICE_TOOLS = [
 
 async def _service_executor(fn_name: str, fn_args: dict):
     if fn_name == "check_service_health":
-        url = fn_args["health_url"]
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            try:
-                r = await client.get(url)
-                try:
-                    body = r.json()
-                except Exception:
-                    body = r.text[:500]
-                return {"url": url, "status_code": r.status_code,
-                        "healthy": 200 <= r.status_code < 300, "response": body}
-            except httpx.ConnectError:
-                return {"url": url, "healthy": False, "error": "connection refused — service is down"}
-            except Exception as e:
-                return {"url": url, "healthy": False, "error": str(e)}
+        return await check_service_health(fn_args["health_url"])
     return await _shared_executor(fn_name, fn_args)
 
 

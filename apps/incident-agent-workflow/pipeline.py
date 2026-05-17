@@ -8,7 +8,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from agents import triage_agent, investigation_agent, code_analysis_agent
+from agents import triage, investigation, code_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -21,38 +21,38 @@ async def run_pipeline(error_payload: dict) -> dict:
 
     # ── Triage ────────────────────────────────────────────────────────────────
     logger.info("[Pipeline %s] TriageAgent running…", pipeline_id)
-    triage = await triage_agent.run(error_payload)
+    triage_result = await triage.run(error_payload)
     logger.info("[Pipeline %s] TriageAgent done — type=%s severity=%s",
-                pipeline_id, triage.get("error_type"), triage.get("severity"))
+                pipeline_id, triage_result.get("error_type"), triage_result.get("severity"))
 
     # Guarantee resolved_config always carries repo_path + log_paths even when
     # the service is not in the registry (LLM may omit it in that case).
-    rc = triage.get("resolved_config") or {}
+    rc = triage_result.get("resolved_config") or {}
     if not rc.get("repo_path"):
         rc["repo_path"] = error_payload.get("repo_path", "")
     if not rc.get("log_paths"):
         rc["log_paths"] = error_payload.get("log_paths", {})
-    triage["resolved_config"] = rc
+    triage_result["resolved_config"] = rc
 
     # ── Investigation ─────────────────────────────────────────────────────────
     logger.info("[Pipeline %s] InvestigationAgent (%s) running…",
-                pipeline_id, triage.get("error_type", "?"))
-    investigation = await investigation_agent.run(triage)
+                pipeline_id, triage_result.get("error_type", "?"))
+    investigation_result = await investigation.run(triage_result)
     logger.info("[Pipeline %s] InvestigationAgent done — confidence=%s",
-                pipeline_id, investigation.get("confidence"))
+                pipeline_id, investigation_result.get("confidence"))
 
     # ── Code Analysis ─────────────────────────────────────────────────────────
     logger.info("[Pipeline %s] CodeAnalysisAgent running…", pipeline_id)
-    code_analysis = await code_analysis_agent.run(triage, investigation)
+    code_analysis_result = await code_analysis.run(triage_result, investigation_result)
     logger.info("[Pipeline %s] CodeAnalysisAgent done — depth=%s complexity=%s",
-                pipeline_id, code_analysis.get("analysis_depth"), code_analysis.get("complexity_assessment"))
+                pipeline_id, code_analysis_result.get("analysis_depth"), code_analysis_result.get("complexity_assessment"))
 
     return {
         "pipeline_id": pipeline_id,
         "status": "completed",
         "started_at": started_at,
         "completed_at": datetime.now(timezone.utc).isoformat(),
-        "triage": triage,
-        "investigation": investigation,
-        "code_analysis": code_analysis,
+        "triage": triage_result,
+        "investigation": investigation_result,
+        "code_analysis": code_analysis_result,
     }

@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 
-from agents.base import run_llm_agent, extract_json
+from agents.llm import run_llm_agent, extract_json
 from tools.git import (
     list_repo_files,
     read_file_lines,

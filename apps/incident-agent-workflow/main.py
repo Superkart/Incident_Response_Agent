@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from config import settings
-from agents.log_analyzer_agent import LogAnalyzerAgent
+from agents import quick_analysis as quick_analysis_agent
 from pipeline import run_pipeline
 from reports.generator import generate_pdf
 
@@ -33,9 +33,6 @@ Instrumentator().instrument(app).expose(app)
 
 PROMETHEUS_URL = "http://prometheus:9090"
 LOKI_URL = "http://loki:3100"
-
-_quick_analyzer = LogAnalyzerAgent()
-
 
 @app.get("/health")
 async def health():
@@ -75,7 +72,7 @@ async def _handle_alert(alert: dict):
     }
 
     # Quick analysis — always runs, gives a reliable baseline even if pipeline fails
-    quick_analysis = await asyncio.to_thread(_quick_analyzer.run, context)
+    quick_analysis = await quick_analysis_agent.run(context)
     log.info("quick_analysis_done service=%s alert=%s", service, alert_name)
 
     error_payload = {**context, "description": annotations.get("description", ""), "status": status}

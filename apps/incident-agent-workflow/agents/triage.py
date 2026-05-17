@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from agents.base import run_llm_agent, extract_json
+from agents.llm import run_llm_agent, extract_json
 from service_registry import get_service_config, list_services
 
 logger = logging.getLogger(__name__)

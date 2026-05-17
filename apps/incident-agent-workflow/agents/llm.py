@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-from abc import ABC, abstractmethod
 from typing import Callable, Awaitable, Any
 
 from openai import AsyncOpenAI
@@ -102,7 +101,6 @@ def extract_json(raw: str) -> dict:
         pass
 
     # Strategy 2: find the outermost {...} block anywhere in the text
-    # handles cases where the LLM adds prose before/after the JSON
     match = re.search(r'\{[\s\S]*\}', raw)
     if match:
         try:
@@ -112,13 +110,3 @@ def extract_json(raw: str) -> dict:
 
     logger.warning("extract_json failed — raw output: %s", raw[:300])
     return {"raw_output": raw, "parse_error": "Could not parse JSON from agent output"}
-
-
-class BaseAgent(ABC):
-    name: str
-    description: str
-
-    @abstractmethod
-    def run(self, context: dict) -> str:
-        """Run the agent with alert context. Returns analysis string."""
-        pass
