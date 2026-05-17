@@ -32,3 +32,6 @@ Thumbs.db
 
 # Old folders
 weather-project-1/
+
+# Claude Code project memory
+.claude/
