@@ -25,6 +25,7 @@ Instrumentator().instrument(app).expose(app)
 
 PROMETHEUS_URL = "http://prometheus:9090"
 LOKI_URL = "http://loki:3100"
+NOTIFIER_URL = "http://notifier:8002/notify"
 
 log_analyzer = LogAnalyzerAgent()
 
@@ -70,6 +71,21 @@ async def receive_alerts(request: Request):
                 annotations.get("summary", ""),
                 prometheus_snapshot, recent_logs,
             )
+
+            try:
+                await client.post(
+                    NOTIFIER_URL,
+                    json={
+                        "service": service,
+                        "alertname": alert_name,
+                        "summary": annotations.get("summary", ""),
+                        "analysis": analysis,
+                    },
+                    timeout=10.0,
+                )
+                log.info("Notification sent for alert=%s service=%s", alert_name, service)
+            except Exception as e:
+                log.warning("Failed to notify: %s", str(e))
 
     return {"status": "accepted", "alerts_received": len(alerts)}
 
