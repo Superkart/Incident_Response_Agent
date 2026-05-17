@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Incident Response Agent — Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 32px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    header p {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .diagram-wrapper {
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 1300px;
+      margin: 0 auto 40px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+    .legend {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #cbd5e0;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Incident Response Agent — System Architecture</h1>
+    <p>Automated 3-agent LLM pipeline: Alert &rarr; Triage &rarr; Investigation &rarr; Code Analysis &rarr; PDF Report &rarr; Email</p>
+  </header>
+
+  <div class="diagram-wrapper">
+    <div class="mermaid">
+%%{init: {
+  "theme": "dark",
+  "themeVariables": {
+    "primaryColor": "#1e3a5f",
+    "primaryTextColor": "#e2e8f0",
+    "primaryBorderColor": "#3b82f6",
+    "lineColor": "#64748b",
+    "secondaryColor": "#1e3a2f",
+    "tertiaryColor": "#2d1f3d",
+    "background": "#1a1f2e",
+    "nodeBorder": "#4a5568",
+    "clusterBkg": "#161b27",
+    "titleColor": "#94a3b8",
+    "edgeLabelBackground": "#1a1f2e"
+  },
+  "flowchart": { "curve": "basis", "padding": 20 }
+}}%%
+
+flowchart TB
+
+  %% ── MONITORED SERVICES ────────────────────────────────────────────────────
+  subgraph SVC["&#128230;  Monitored Services"]
+    direction LR
+    WA["<b>weather-app1</b><br/>FastAPI · Port 8000<br/>Generates weather forecasts"]
+    MAS["<b>mongo-api-service</b><br/>FastAPI · Port 9000<br/>REST API over MongoDB"]
+    MG[("<b>MongoDB</b><br/>Port 27017")]
+    MAS --> MG
+  end
+
+  %% ── MONITORING STACK ──────────────────────────────────────────────────────
+  subgraph MON["&#128269;  Monitoring Stack"]
+    direction LR
+    PROM["<b>Prometheus</b><br/>Port 9090<br/>Metrics + Alert Rules"]
+    AM["<b>Alertmanager</b><br/>Port 9093<br/>Routes alerts"]
+    GF["<b>Grafana</b><br/>Port 3000<br/>Dashboards"]
+    PROM -- "alert rules fired" --> AM
+    GF -. "query metrics" .-> PROM
+    GF -. "query logs" .-> LOKI
+  end
+
+  %% ── LOG PIPELINE ──────────────────────────────────────────────────────────
+  subgraph LOGS["&#128196;  Log Pipeline"]
+    direction LR
+    PT["<b>Promtail</b><br/>Tail &amp; ship logs"]
+    LOKI["<b>Loki</b><br/>Port 3100<br/>Log aggregation"]
+    PT -- "push logs" --> LOKI
+  end
+
+  %% ── INCIDENT PIPELINE ─────────────────────────────────────────────────────
+  subgraph INC["&#129302;  Incident Response Pipeline  ·  Port 9100"]
+    direction TB
+    IAW["<b>incident-agent-workflow</b><br/>FastAPI · Receives alert webhooks<br/>Queries Prometheus + Loki for context"]
+
+    subgraph QUICK["Fast Path"]
+      QA["<b>Quick Analysis</b><br/>Plain-chat LLM<br/>Instant baseline summary"]
+    end
+
+    subgraph PIPE["3-Agent Deep Pipeline"]
+      direction LR
+      T["<b>&#9312; Triage Agent</b><br/>Classifies severity<br/>Resolves service config<br/>Creates incident ticket"]
+      I["<b>&#9313; Investigation Agent</b><br/>Greps log files<br/>Health check<br/>Extracts stack trace"]
+      C["<b>&#9314; Code Analysis Agent</b><br/>Reads source at file:line<br/>Git log check<br/>Root cause + fix"]
+      T -- "resolved config<br/>+ log paths" --> I
+      I -- "stack trace<br/>+ hypothesis" --> C
+    end
+
+    PDF["<b>PDF Generator</b><br/>WeasyPrint HTML&#8594;PDF<br/>Full incident report"]
+
+    IAW --> QA
+    IAW --> T
+    C --> PDF
+  end
+
+  %% ── NOTIFICATION ──────────────────────────────────────────────────────────
+  subgraph NOTIF["&#128235;  Notification"]
+    NOT["<b>Notifier</b><br/>Port 8002<br/>Formats message + attaches PDF"]
+    EMAIL["<b>Gmail SMTP</b><br/>Sends to on-call engineer"]
+    NOT --> EMAIL
+  end
+
+  %% ── LLM HOST ──────────────────────────────────────────────────────────────
+  subgraph LLM["&#129504;  LLM  ·  Host Machine"]
+    OLL["<b>Ollama</b><br/>Port 11434<br/>qwen2.5:14b<br/>Tool-calling + JSON schema"]
+  end
+
+  %% ── CROSS-GROUP FLOWS ─────────────────────────────────────────────────────
+  WA  -- "Prometheus metrics<br/>/metrics endpoint" --> PROM
+  MAS -- "Prometheus metrics<br/>/metrics endpoint" --> PROM
+  WA  -- "app.log" --> PT
+  MAS -- "app.log" --> PT
+
+  AM  -- "POST /alerts<br/>webhook" --> IAW
+  IAW -- "query recent logs" --> LOKI
+  IAW -- "query metric snapshot" --> PROM
+
+  QA  -- "analysis text" --> NOT
+  PDF -- "PDF bytes (base64)" --> NOT
+
+  QA  -. "chat completions" .-> OLL
+  T   -. "tool-calling loop" .-> OLL
+  I   -. "tool-calling loop" .-> OLL
+  C   -. "tool-calling loop" .-> OLL
+
+  I   -. "read log files<br/>(volume mount)" .-> WA
+  I   -. "read log files<br/>(volume mount)" .-> MAS
+  C   -. "read source code<br/>(volume mount)" .-> WA
+  C   -. "read source code<br/>(volume mount)" .-> MAS
+
+  %% ── STYLES ────────────────────────────────────────────────────────────────
+  classDef service    fill:#1e3a5f,stroke:#3b82f6,color:#e2e8f0,rx:6
+  classDef monitor    fill:#2d1f4e,stroke:#8b5cf6,color:#e2e8f0,rx:6
+  classDef logpipe    fill:#1a2f3a,stroke:#06b6d4,color:#e2e8f0,rx:6
+  classDef agent      fill:#1e3a2f,stroke:#10b981,color:#e2e8f0,rx:6
+  classDef infra      fill:#3a2a1e,stroke:#f59e0b,color:#e2e8f0,rx:6
+  classDef notif      fill:#1f2e1e,stroke:#22c55e,color:#e2e8f0,rx:6
+  classDef llm        fill:#3a1e2a,stroke:#ec4899,color:#e2e8f0,rx:6
+  classDef db         fill:#2a1e1e,stroke:#ef4444,color:#e2e8f0
+
+  class WA,MAS service
+  class MG db
+  class PROM,AM,GF monitor
+  class PT,LOKI logpipe
+  class IAW,QA,T,I,C,PDF agent
+  class NOT,EMAIL notif
+  class OLL llm
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#3b82f6;"></div>Monitored Services</div>
+    <div class="legend-item"><div class="dot" style="background:#8b5cf6;"></div>Monitoring Stack (Prometheus · Alertmanager · Grafana)</div>
+    <div class="legend-item"><div class="dot" style="background:#06b6d4;"></div>Log Pipeline (Promtail · Loki)</div>
+    <div class="legend-item"><div class="dot" style="background:#10b981;"></div>Incident Response Pipeline (3 Agents + PDF)</div>
+    <div class="legend-item"><div class="dot" style="background:#22c55e;"></div>Notification (Notifier · Gmail)</div>
+    <div class="legend-item"><div class="dot" style="background:#ec4899;"></div>LLM Host (Ollama · qwen2.5:14b)</div>
+    <div class="legend-item"><div class="dot" style="background:#64748b;"></div>Solid line = data flow &nbsp;·&nbsp; Dashed line = query / read</div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      securityLevel: 'loose',
+      flowchart: { useMaxWidth: true, htmlLabels: true }
+    });
+  </script>
+</body>
+</html>
