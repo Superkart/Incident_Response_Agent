@@ -1,0 +1,17 @@
+- targets:
+    - weather-app1:8000
+  labels:
+    service: weather-app1
+    env: local-docker
+
+- targets:
+    - mongo-api-service:9000
+  labels:
+    service: mongo-api-service
+    env: local-docker
+
+- targets:
+    - incident-agent-workflow:9100
+  labels:
+    service: incident-agent-workflow
+    env: local-docker

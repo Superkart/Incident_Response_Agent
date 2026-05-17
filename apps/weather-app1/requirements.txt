@@ -1,0 +1,4 @@
+fastapi==0.115.0
+httpx
+prometheus-fastapi-instrumentator
+uvicorn==0.30.6

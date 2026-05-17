@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status as http_status
 from datetime import datetime, timezone
 
-from app.database import client, get_db
+from app import database
 from app.config import settings
 from app.logger import get_logger
 
@@ -18,11 +18,14 @@ async def health():
 
 
 @router.get("/health/ready")
-async def readiness():
+async def readiness(response: Response):
     """Readiness probe — checks MongoDB connectivity."""
     try:
+        client = database.get_client()
+        if client is None:
+            raise RuntimeError("MongoDB client is not initialized")
         await client.admin.command("ping")
-        db = get_db()
+        db = database.get_db()
         stats = await db.command("dbStats")
         mongo_ok = True
         collections = stats.get("collections", 0)
@@ -33,9 +36,12 @@ async def readiness():
 
     uptime_seconds = (datetime.now(timezone.utc) - START_TIME).total_seconds()
 
-    status = "ready" if mongo_ok else "degraded"
+    readiness_status = "ready" if mongo_ok else "degraded"
+    if not mongo_ok:
+        response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
+
     return {
-        "status": status,
+        "status": readiness_status,
         "uptime_seconds": round(uptime_seconds, 1),
         "mongo": {
             "connected": mongo_ok,

@@ -1,0 +1,141 @@
+services:
+  weather-app1:
+    build:
+      context: .
+      dockerfile: apps/weather-app1/Dockerfile
+    container_name: weather-app1
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/weather-app1/logs:/app/logs
+
+  mongo:
+    image: mongo:7.0
+    container_name: mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  mongo-api-service:
+    build:
+      context: .
+      dockerfile: apps/mongo-api-service/Dockerfile
+    container_name: mongo-api-service
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    env_file:
+      - ./apps/mongo-api-service/.env
+    volumes:
+      - ./apps/mongo-api-service/logs:/app/logs
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/targets.docker.yml:/etc/prometheus/targets.yml:ro
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+    depends_on:
+      - weather-app1
+      - mongo-api-service
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    depends_on:
+      - incident-agent-workflow
+
+  incident-agent-workflow:
+    build:
+      context: .
+      dockerfile: apps/incident-agent-workflow/Dockerfile
+    container_name: incident-agent-workflow
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - ./apps/incident-agent-workflow/logs:/app/logs
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - ./apps/weather-app1/logs:/var/log/apps/weather-app1:ro
+      - ./apps/mongo-api-service/logs:/var/log/apps/mongo-api-service:ro
+      - ./apps/incident-agent-workflow/logs:/var/log/apps/incident-agent-workflow:ro
+    depends_on:
+      - loki
+      - weather-app1
+      - mongo-api-service
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  mongo_data:
+  grafana_storage:
+  loki_data:
