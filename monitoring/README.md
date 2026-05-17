@@ -41,6 +41,7 @@ Useful URLs:
 ```text
 Prometheus: http://127.0.0.1:9090
 Grafana:    http://127.0.0.1:3000
+Loki:       http://127.0.0.1:3100
 ```
 
 Useful PromQL:
@@ -64,4 +65,20 @@ For service logs, check the app log file:
 
 ```bash
 tail -f ../apps/weather-app1/logs/app.log
+```
+
+When running the root Docker Compose stack, Promtail ships these log files to Loki:
+
+```text
+../apps/weather-app1/logs/*.log
+../apps/mongo-api-service/logs/*.log
+```
+
+In Grafana, use the Loki data source and these LogQL queries:
+
+```logql
+{service="weather-app1"}
+{service="mongo-api-service"}
+{service="weather-app1"} |= "ERROR"
+{service="mongo-api-service"} |= "ERROR"
 ```
