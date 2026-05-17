@@ -4,6 +4,12 @@
     service: weather-app1
     env: local
 
+- targets:
+    - host.docker.internal:9000
+  labels:
+    service: mongo-api-service
+    env: local
+
 # Add more local services here. Each service must expose /metrics.
 # Run host services with --host 0.0.0.0 so Docker Prometheus can reach them.
 #

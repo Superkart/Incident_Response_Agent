@@ -1,5 +1,9 @@
-fastapi
 httpx
 prometheus-fastapi-instrumentator
-pydantic
-uvicorn
+fastapi==0.115.0
+uvicorn==0.30.6
+motor==3.5.1
+pymongo==4.8.0
+pydantic==2.8.2
+pydantic-settings==2.4.0
+python-dotenv==1.0.1
