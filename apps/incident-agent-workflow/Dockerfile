@@ -23,7 +23,6 @@ COPY apps/incident-agent-workflow/service_registry.json .
 COPY apps/incident-agent-workflow/agents/ ./agents/
 COPY apps/incident-agent-workflow/tools/ ./tools/
 COPY apps/incident-agent-workflow/reports/ ./reports/
-COPY apps/incident-agent-workflow/llm/ ./llm/
 
 RUN mkdir -p /app/logs
 
